@@ -1,0 +1,16 @@
+{
+  "name": "ramadan-notifier",
+  "version": "1.0.0",
+  "description": "Ramadan plan notification server for Cairo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "web-push": "^3.6.6",
+    "node-cron": "^3.0.3",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5"
+  }
+}

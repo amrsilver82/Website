@@ -74,11 +74,12 @@ async function getMaghribTime(date) {
 
   const url = `https://api.aladhan.com/v1/timingsByCity/${day}-${month}-${year}?city=Cairo&country=Egypt&method=5`;
   const response = await axios.get(url);
-  const maghribStr = response.data.data.timings.Maghrib; // e.g. "18:15"
+  const maghribStr = response.data.data.timings.Maghrib; // e.g. "18:15" in Cairo local time
   const [hours, minutes] = maghribStr.split(':').map(Number);
 
-  const maghrib = new Date(date);
-  maghrib.setHours(hours, minutes, 0, 0);
+  // Cairo is UTC+2. We construct the time as UTC by subtracting 2 hours.
+  // This ensures the server (which runs in UTC) fires notifications at the correct Cairo time.
+  const maghrib = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hours - 2, minutes, 0, 0));
   return maghrib;
 }
 

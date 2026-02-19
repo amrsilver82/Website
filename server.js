@@ -180,7 +180,7 @@ app.get('/vapid-public-key', (req, res) => {
 app.get('/today-schedule', async (req, res) => {
   await buildTodaySchedule();
   const schedule = todaySchedule.map(item => ({
-    time: item.time.toLocaleTimeString('en-EG', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    time: item.time.toLocaleTimeString('en-EG', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo' }),
     title: item.title,
     body: item.body,
     sent: item.sent

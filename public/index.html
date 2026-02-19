@@ -196,6 +196,9 @@
   <button class="btn btn-secondary" onclick="sendTest()">
     🧪 Send Test Notification
   </button>
+  <button class="btn btn-secondary" onclick="resubscribe()" style="margin-top:10px; background: rgba(255,100,100,0.15);">
+    🔄 Fix Notifications (Re-subscribe)
+  </button>
   <div id="message"></div>
 </div>
 
@@ -314,6 +317,31 @@
       showMessage('Test notification sent!', 'info');
     } catch (e) {
       showMessage('Error sending test', 'error');
+    }
+  }
+
+  // ── Re-subscribe ─────────────────────────────────────────────────────────────
+  async function resubscribe() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe();
+      
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey)
+      });
+
+      await fetch(SERVER + '/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+      });
+
+      showMessage('✅ Re-subscribed! Try test notification now.', 'success');
+      checkNotificationStatus();
+    } catch (err) {
+      showMessage('Error: ' + err.message, 'error');
     }
   }
 

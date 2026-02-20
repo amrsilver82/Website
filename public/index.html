@@ -133,6 +133,9 @@
 
     .schedule-item.sent .title { color: #4ade80; }
     .schedule-item.sent .schedule-time { color: #4ade80; }
+    .schedule-item.shifted { border-left: 3px solid #c9a96e; padding-left: 9px; }
+    .meal-btn { background: linear-gradient(135deg, #1a6b3c, #0f4a28); border: 1px solid #2ecc71; margin-bottom: 10px; }
+    .meal-logged { background: rgba(46,204,113,0.15); border: 1px solid rgba(46,204,113,0.3); color: #2ecc71; padding: 12px; border-radius: 12px; text-align: center; font-size: 0.9rem; margin-bottom: 10px; display: none; }
 
     .maghrib-display {
       font-size: 2rem;
@@ -200,6 +203,21 @@
     🔄 Fix Notifications (Re-subscribe)
   </button>
   <div id="message"></div>
+</div>
+
+<!-- Meal Finish Logger -->
+<div class="card" id="mealCard">
+  <h2>🍽️ Meal Logger</h2>
+  <p style="font-size:0.85rem; color:rgba(255,255,255,0.6); margin-bottom:14px;">
+    If you finished your meal later than usual, tap below. All remaining notifications will shift automatically.
+  </p>
+  <div class="meal-logged" id="mealLogged">✅ Meal finish logged! Schedule shifted.</div>
+  <button class="btn meal-btn" id="mealBtn" onclick="logMealFinish()">
+    🍽️ I finished my meal — shift schedule
+  </button>
+  <button class="btn btn-secondary" id="resetBtn" onclick="resetMeal()" style="margin-top:8px; display:none;">
+    🔄 Reset to automatic schedule
+  </button>
 </div>
 
 <!-- Today's Schedule -->
@@ -310,6 +328,44 @@
     }
   }
 
+  // ── Log Meal Finish ───────────────────────────────────────────────────────────
+  async function logMealFinish() {
+    try {
+      const res = await fetch(SERVER + '/meal-finished', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('mealLogged').style.display = 'block';
+        document.getElementById('mealBtn').disabled = true;
+        document.getElementById('mealBtn').style.opacity = '0.5';
+        document.getElementById('mealBtn').textContent = '✅ Meal logged at ' + data.finishTime;
+        document.getElementById('resetBtn').style.display = 'block';
+        showMessage('Schedule shifted! Check updated times below.', 'success');
+        setTimeout(loadSchedule, 1000);
+      }
+    } catch (e) {
+      showMessage('Error logging meal: ' + e.message, 'error');
+    }
+  }
+
+  // ── Reset Meal ───────────────────────────────────────────────────────────────
+  async function resetMeal() {
+    try {
+      const res = await fetch(SERVER + '/reset-meal', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('mealLogged').style.display = 'none';
+        document.getElementById('mealBtn').disabled = false;
+        document.getElementById('mealBtn').style.opacity = '1';
+        document.getElementById('mealBtn').textContent = '🍽️ I finished my meal — shift schedule';
+        document.getElementById('resetBtn').style.display = 'none';
+        showMessage('Schedule reset to automatic!', 'info');
+        setTimeout(loadSchedule, 1000);
+      }
+    } catch (e) {
+      showMessage('Error resetting: ' + e.message, 'error');
+    }
+  }
+
   // ── Test Notification ─────────────────────────────────────────────────────────
   async function sendTest() {
     try {
@@ -349,7 +405,15 @@
   async function loadSchedule() {
     try {
       const res = await fetch(`${SERVER}/today-schedule`);
-      const schedule = await res.json();
+      const data = await res.json();
+      const schedule = data.schedule;
+      if (data.mealLogged) {
+        document.getElementById('mealLogged').style.display = 'block';
+        document.getElementById('mealBtn').disabled = true;
+        document.getElementById('mealBtn').style.opacity = '0.5';
+        document.getElementById('mealBtn').textContent = '✅ Meal already logged today';
+        document.getElementById('resetBtn').style.display = 'block';
+      }
 
       if (schedule.length === 0) {
         document.getElementById('scheduleContainer').innerHTML = '<div class="loading">Could not load schedule</div>';
@@ -367,7 +431,7 @@
 
       for (const item of schedule) {
         const li = document.createElement('li');
-        li.className = 'schedule-item' + (item.sent ? ' sent' : '');
+        li.className = 'schedule-item' + (item.sent ? ' sent' : '') + (item.shifted ? ' shifted' : '');
         li.innerHTML = `
           <div class="schedule-time">${item.time}</div>
           <div class="schedule-content">

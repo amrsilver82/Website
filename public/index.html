@@ -220,6 +220,21 @@
   </button>
 </div>
 
+<!-- Dessert Finish Logger -->
+<div class="card" id="dessertCard">
+  <h2>🍬 Dessert Logger</h2>
+  <p style="font-size:0.85rem; color:rgba(255,255,255,0.6); margin-bottom:14px;">
+    If you finished dessert later than usual, tap below. All remaining notifications will shift automatically.
+  </p>
+  <div class="meal-logged" id="dessertLogged">✅ Dessert finish logged! Schedule shifted.</div>
+  <button class="btn meal-btn" id="dessertBtn" onclick="logDessertFinish()">
+    🍬 I finished my dessert — shift schedule
+  </button>
+  <button class="btn btn-secondary" id="resetDessertBtn" onclick="resetDessert()" style="margin-top:8px; display:none;">
+    🔄 Reset dessert schedule
+  </button>
+</div>
+
 <!-- Today's Schedule -->
 <div class="card">
   <h2>Today's Schedule</h2>
@@ -363,6 +378,43 @@
       }
     } catch (e) {
       showMessage('Error resetting: ' + e.message, 'error');
+    }
+  }
+
+  // ── Log Dessert Finish ──────────────────────────────────────────────────────
+  async function logDessertFinish() {
+    try {
+      const res = await fetch(SERVER + '/dessert-finished', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('dessertLogged').style.display = 'block';
+        document.getElementById('dessertBtn').disabled = true;
+        document.getElementById('dessertBtn').style.opacity = '0.5';
+        document.getElementById('dessertBtn').textContent = '✅ Dessert logged at ' + data.finishTime;
+        document.getElementById('resetDessertBtn').style.display = 'block';
+        showMessage('Schedule shifted after dessert!', 'success');
+        setTimeout(loadSchedule, 1000);
+      }
+    } catch (e) {
+      showMessage('Error: ' + e.message, 'error');
+    }
+  }
+
+  async function resetDessert() {
+    try {
+      const res = await fetch(SERVER + '/reset-dessert', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('dessertLogged').style.display = 'none';
+        document.getElementById('dessertBtn').disabled = false;
+        document.getElementById('dessertBtn').style.opacity = '1';
+        document.getElementById('dessertBtn').textContent = '🍬 I finished my dessert — shift schedule';
+        document.getElementById('resetDessertBtn').style.display = 'none';
+        showMessage('Dessert schedule reset!', 'info');
+        setTimeout(loadSchedule, 1000);
+      }
+    } catch (e) {
+      showMessage('Error: ' + e.message, 'error');
     }
   }
 

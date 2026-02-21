@@ -59,12 +59,12 @@ const SCHEDULE = [
   { offset: 100, shiftable: true,  shiftOffset: 60,  title: '💧 Hydration #2',                body: 'Drink 250ml cool water. Keep it steady.' },
   { offset: 145, shiftable: true,  shiftOffset: 105, title: '💧 Hydration #3',                body: 'Drink 250ml cool water.' },
   { offset: 155, shiftable: true,  shiftOffset: 115, title: '🍬 Dessert window opens!',       body: 'Dessert is OK now! Keep it to 1 palm portion.' },
-  { offset: 160, shiftable: true,  shiftOffset: 120, title: '💧 Hydration #4',                body: 'Drink 250ml cool water.' },
-  { offset: 175, shiftable: true,  shiftOffset: 135, title: '💧 Hydration #5',                body: 'Drink 250ml cool water. Almost at 2L!' },
-  { offset: 205, shiftable: true,  shiftOffset: 165, title: '💧 Hydration #6',                body: 'Drink 200–250ml warm water. After dessert hydration.' },
-  { offset: 255, shiftable: true,  shiftOffset: 215, title: '🥗 Last meal time (protein cap)', body: 'Light meal: milk/yogurt/eggs/cheese + cucumber/tomato.' },
-  { offset: 300, shiftable: true,  shiftOffset: 260, title: '💧 Last big drink of the night', body: 'Drink 300ml cool water. This is your last proper drink!' },
-  { offset: 325, shiftable: true,  shiftOffset: 285, title: '🚫 Fluids OFF',                  body: 'Stop drinking now. Tiny sips only if mouth is dry. Sleep well!' },
+  { offset: 160, shiftable: true,  shiftOffset: 120, dessertShiftable: true,  dessertShiftOffset: 0,   title: '💧 Hydration #4',                body: 'Drink 250ml cool water.' },
+  { offset: 175, shiftable: true,  shiftOffset: 135, dessertShiftable: true,  dessertShiftOffset: 15,  title: '💧 Hydration #5',                body: 'Drink 250ml cool water. Almost at 2L!' },
+  { offset: 205, shiftable: true,  shiftOffset: 165, dessertShiftable: true,  dessertShiftOffset: 45,  title: '💧 Hydration #6',                body: 'Drink 200–250ml warm water. After dessert hydration.' },
+  { offset: 255, shiftable: true,  shiftOffset: 215, dessertShiftable: true,  dessertShiftOffset: 95,  title: '🥗 Last meal time (protein cap)', body: 'Light meal: milk/yogurt/eggs/cheese + cucumber/tomato.' },
+  { offset: 300, shiftable: true,  shiftOffset: 260, dessertShiftable: true,  dessertShiftOffset: 140, title: '💧 Last big drink of the night', body: 'Drink 300ml cool water. This is your last proper drink!' },
+  { offset: 325, shiftable: true,  shiftOffset: 285, dessertShiftable: true,  dessertShiftOffset: 165, title: '🚫 Fluids OFF',                  body: 'Stop drinking now. Tiny sips only if mouth is dry. Sleep well!' },
 ];
 
 // ─── FETCH MAGHRIB TIME ───────────────────────────────────────────────────────
@@ -109,6 +109,7 @@ async function sendNotification(title, body) {
 let todaySchedule = [];
 let lastScheduleDate = null;
 let mealFinishTime = null; // set when user logs meal finish
+let dessertFinishTime = null; // set when user logs dessert finish
 
 async function buildTodaySchedule() {
   const today = new Date();
@@ -118,6 +119,7 @@ async function buildTodaySchedule() {
   lastScheduleDate = dateKey;
   todaySchedule = [];
   mealFinishTime = null; // reset each day
+  dessertFinishTime = null; // reset each day
 
   try {
     const maghrib = await getMaghribTime(today);
@@ -131,6 +133,8 @@ async function buildTodaySchedule() {
         body: step.body,
         shiftable: step.shiftable,
         shiftOffset: step.shiftOffset || 0,
+        dessertShiftable: step.dessertShiftable || false,
+        dessertShiftOffset: step.dessertShiftOffset || 0,
         sent: false,
         shifted: false
       });
@@ -157,6 +161,23 @@ function applyMealFinishShift(finishTime) {
   }
 
   console.log(`Shifted ${shifted} notifications based on meal finish time: ${finishTime.toISOString()}`);
+}
+
+// ─── SHIFT SCHEDULE AFTER DESSERT FINISH ────────────────────────────────────
+function applyDessertFinishShift(finishTime) {
+  dessertFinishTime = finishTime;
+  let shifted = 0;
+
+  for (const item of todaySchedule) {
+    if (item.dessertShiftable && !item.sent) {
+      const newTime = new Date(finishTime.getTime() + item.dessertShiftOffset * 60000);
+      item.time = newTime;
+      item.shifted = true;
+      shifted++;
+    }
+  }
+
+  console.log('Shifted ' + shifted + ' notifications based on dessert finish time: ' + finishTime.toISOString());
 }
 
 // Run every minute
@@ -206,6 +227,28 @@ app.post('/meal-finished', (req, res) => {
   res.json({ success: true, finishTime: cairoTime });
 });
 
+// Log dessert finish time → shift remaining notifications
+app.post('/dessert-finished', (req, res) => {
+  const finishTime = new Date();
+  applyDessertFinishShift(finishTime);
+
+  const cairoTime = finishTime.toLocaleTimeString('en-EG', {
+    hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo'
+  });
+
+  sendNotification('🍬 Dessert logged!', 'Finished at ' + cairoTime + '. Remaining notifications shifted.');
+  res.json({ success: true, finishTime: cairoTime });
+});
+
+// Reset dessert finish log
+app.post('/reset-dessert', (req, res) => {
+  dessertFinishTime = null;
+  lastScheduleDate = null;
+  buildTodaySchedule();
+  console.log('Dessert finish reset. Schedule restored.');
+  res.json({ success: true });
+});
+
 // Reset meal finish log
 app.post('/reset-meal', (req, res) => {
   mealFinishTime = null;
@@ -226,7 +269,7 @@ app.get('/today-schedule', async (req, res) => {
     sent: item.sent,
     shifted: item.shifted || false
   }));
-  res.json({ schedule, mealLogged: mealFinishTime !== null });
+  res.json({ schedule, mealLogged: mealFinishTime !== null, dessertLogged: dessertFinishTime !== null });
 });
 
 // Test notification

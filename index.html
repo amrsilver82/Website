@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Ramadan Plan"/>
+  <title>Ramadan Plan 🌙</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      color: white;
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      padding: 30px 0 20px;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .header p {
+      color: #c9a96e;
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      backdrop-filter: blur(10px);
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      color: #c9a96e;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #555;
+      flex-shrink: 0;
+    }
+
+    .dot.green { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+    .dot.red { background: #f87171; }
+    .dot.yellow { background: #facc15; }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn:active { opacity: 0.8; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #c9a96e, #a07840);
+      color: white;
+      margin-bottom: 10px;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .schedule-list {
+      list-style: none;
+    }
+
+    .schedule-item {
+      display: flex;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      align-items: flex-start;
+    }
+
+    .schedule-item:last-child { border-bottom: none; }
+
+    .schedule-time {
+      font-size: 0.8rem;
+      color: #c9a96e;
+      min-width: 72px;
+      padding-top: 2px;
+      font-weight: 600;
+    }
+
+    .schedule-content .title {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .schedule-content .desc {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.6);
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+
+    .schedule-item.sent .title { color: #4ade80; }
+    .schedule-item.sent .schedule-time { color: #4ade80; }
+    .schedule-item.shifted { border-left: 3px solid #c9a96e; padding-left: 9px; }
+    .meal-btn { background: linear-gradient(135deg, #1a6b3c, #0f4a28); border: 1px solid #2ecc71; margin-bottom: 10px; }
+    .meal-logged { background: rgba(46,204,113,0.15); border: 1px solid rgba(46,204,113,0.3); color: #2ecc71; padding: 12px; border-radius: 12px; text-align: center; font-size: 0.9rem; margin-bottom: 10px; display: none; }
+
+    .maghrib-display {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #c9a96e;
+      text-align: center;
+      margin: 8px 0 4px;
+    }
+
+    .maghrib-label {
+      text-align: center;
+      color: rgba(255,255,255,0.5);
+      font-size: 0.85rem;
+    }
+
+    .loading {
+      text-align: center;
+      color: rgba(255,255,255,0.4);
+      padding: 20px;
+      font-size: 0.9rem;
+    }
+
+    #message {
+      text-align: center;
+      padding: 10px;
+      border-radius: 10px;
+      margin-top: 10px;
+      font-size: 0.85rem;
+      display: none;
+    }
+
+    #message.success { background: rgba(74,222,128,0.15); color: #4ade80; display: block; }
+    #message.error { background: rgba(248,113,113,0.15); color: #f87171; display: block; }
+    #message.info { background: rgba(201,169,110,0.15); color: #c9a96e; display: block; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🌙 Ramadan Plan</h1>
+  <p>Cairo, Egypt — Your daily schedule</p>
+</div>
+
+<!-- Maghrib Time -->
+<div class="card">
+  <h2>Today's Maghrib</h2>
+  <div class="maghrib-display" id="maghribTime">--:--</div>
+  <div class="maghrib-label">All times calculated from this</div>
+</div>
+
+<!-- Notification Setup -->
+<div class="card">
+  <h2>Notifications</h2>
+  <div class="status-row">
+    <div class="dot" id="notifDot"></div>
+    <span id="notifStatus">Checking...</span>
+  </div>
+  <button class="btn btn-primary" id="enableBtn" onclick="enableNotifications()">
+    🔔 Enable Notifications
+  </button>
+  <button class="btn btn-secondary" onclick="sendTest()">
+    🧪 Send Test Notification
+  </button>
+  <button class="btn btn-secondary" onclick="resubscribe()" style="margin-top:10px; background: rgba(255,100,100,0.15);">
+    🔄 Fix Notifications (Re-subscribe)
+  </button>
+  <div id="message"></div>
+</div>
+
+<!-- Meal Finish Logger -->
+<div class="card" id="mealCard">
+  <h2>🍽️ Meal Logger</h2>
+  <p style="font-size:0.85rem; color:rgba(255,255,255,0.6); margin-bottom:14px;">
+    If you finished your meal later than usual, tap below. All remaining notifications will shift automatically.
+  </p>
+  <div class="meal-logged" id="mealLogged">✅ Meal finish logged! Schedule shifted.</div>
+  <button class="btn meal-btn" id="mealBtn" onclick="logMealFinish()">
+    🍽️ I finished my meal — shift schedule
+  </button>
+  <button class="btn btn-secondary" id="resetBtn" onclick="resetMeal()" style="margin-top:8px; display:none;">
+    🔄 Reset to automatic schedule
+  </button>
+</div>
+
+<!-- Dessert Finish Logger -->
+<div class="card" id="dessertCard">
+  <h2>🍬 Dessert Logger</h2>
+  <p style="font-size:0.85rem; color:rgba(255,255,255,0.6); margin-bottom:14px;">
+    If you finished dessert later than usual, tap below. All remaining notifications will shift automatically.
+  </p>
+  <div class="meal-logged" id="dessertLogged">✅ Dessert finish logged! Schedule shifted.</div>
+  <button class="btn meal-btn" id="dessertBtn" onclick="logDessertFinish()">
+    🍬 I finished my dessert — shift schedule
+  </button>
+  <button class="btn btn-secondary" id="resetDessertBtn" onclick="resetDessert()" style="margin-top:8px; display:none;">
+    🔄 Reset dessert schedule
+  </button>
+</div>
+
+<!-- Today's Schedule -->
+<div class="card">
+  <h2>Today's Schedule</h2>
+  <div id="scheduleContainer">
+    <div class="loading">Loading schedule...</div>
+  </div>
+</div>
+
+<script>
+  const SERVER = window.location.origin;
+  let vapidKey = null;
+
+  // ── Utility ──────────────────────────────────────────────────────────────────
+  function showMessage(text, type) {
+    const el = document.getElementById('message');
+    el.textContent = text;
+    el.className = type;
+    setTimeout(() => { el.className = ''; el.textContent = ''; }, 5000);
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return new Uint8Array([...rawData].map(c => c.charCodeAt(0)));
+  }
+
+  // ── Load VAPID key ────────────────────────────────────────────────────────────
+  async function loadVapidKey() {
+    try {
+      const res = await fetch(`${SERVER}/vapid-public-key`);
+      const data = await res.json();
+      vapidKey = data.key;
+    } catch (e) {
+      console.error('Could not load VAPID key', e);
+    }
+  }
+
+  // ── Check notification status ─────────────────────────────────────────────────
+  async function checkNotificationStatus() {
+    const dot = document.getElementById('notifDot');
+    const status = document.getElementById('notifStatus');
+    const btn = document.getElementById('enableBtn');
+
+    if (!('Notification' in window)) {
+      dot.className = 'dot red';
+      status.textContent = 'Notifications not supported on this browser';
+      btn.style.display = 'none';
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      // Check if subscribed
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        dot.className = 'dot green';
+        status.textContent = 'Notifications active ✓';
+        btn.textContent = '✅ Already enabled';
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+      } else {
+        dot.className = 'dot yellow';
+        status.textContent = 'Permission granted but not subscribed';
+      }
+    } else if (Notification.permission === 'denied') {
+      dot.className = 'dot red';
+      status.textContent = 'Notifications blocked — enable in phone Settings';
+      btn.style.display = 'none';
+    } else {
+      dot.className = 'dot yellow';
+      status.textContent = 'Tap button to enable notifications';
+    }
+  }
+
+  // ── Enable Notifications ──────────────────────────────────────────────────────
+  async function enableNotifications() {
+    if (!vapidKey) {
+      showMessage('Server not ready. Try again in a moment.', 'error');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        showMessage('Permission denied. Please allow in Settings.', 'error');
+        return;
+      }
+
+      const reg = await navigator.serviceWorker.ready;
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey)
+      });
+
+      await fetch(`${SERVER}/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+      });
+
+      showMessage('✅ Notifications enabled! You will be notified automatically.', 'success');
+      checkNotificationStatus();
+    } catch (err) {
+      showMessage('Error: ' + err.message, 'error');
+    }
+  }
+
+  // ── Log Meal Finish ───────────────────────────────────────────────────────────
+  async function logMealFinish() {
+    try {
+      const res = await fetch(SERVER + '/meal-finished', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('mealLogged').style.display = 'block';
+        document.getElementById('mealBtn').disabled = true;
+        document.getElementById('mealBtn').style.opacity = '0.5';
+        document.getElementById('mealBtn').textContent = '✅ Meal logged at ' + data.finishTime;
+        document.getElementById('resetBtn').style.display = 'block';
+        showMessage('Schedule shifted! Check updated times below.', 'success');
+        setTimeout(loadSchedule, 1000);
+      }
+    } catch (e) {
+      showMessage('Error logging meal: ' + e.message, 'error');
+    }
+  }
+
+  // ── Reset Meal ───────────────────────────────────────────────────────────────
+  async function resetMeal() {
+    try {
+      const res = await fetch(SERVER + '/reset-meal', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('mealLogged').style.display = 'none';
+        document.getElementById('mealBtn').disabled = false;
+        document.getElementById('mealBtn').style.opacity = '1';
+        document.getElementById('mealBtn').textContent = '🍽️ I finished my meal — shift schedule';
+        document.getElementById('resetBtn').style.display = 'none';
+        showMessage('Schedule reset to automatic!', 'info');
+        setTimeout(loadSchedule, 1000);
+      }
+    } catch (e) {
+      showMessage('Error resetting: ' + e.message, 'error');
+    }
+  }
+
+  // ── Log Dessert Finish ──────────────────────────────────────────────────────
+  async function logDessertFinish() {
+    try {
+      const res = await fetch(SERVER + '/dessert-finished', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('dessertLogged').style.display = 'block';
+        document.getElementById('dessertBtn').disabled = true;
+        document.getElementById('dessertBtn').style.opacity = '0.5';
+        document.getElementById('dessertBtn').textContent = '✅ Dessert logged at ' + data.finishTime;
+        document.getElementById('resetDessertBtn').style.display = 'block';
+        showMessage('Schedule shifted after dessert!', 'success');
+        setTimeout(loadSchedule, 1000);
+      }
+    } catch (e) {
+      showMessage('Error: ' + e.message, 'error');
+    }
+  }
+
+  async function resetDessert() {
+    try {
+      const res = await fetch(SERVER + '/reset-dessert', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('dessertLogged').style.display = 'none';
+        document.getElementById('dessertBtn').disabled = false;
+        document.getElementById('dessertBtn').style.opacity = '1';
+        document.getElementById('dessertBtn').textContent = '🍬 I finished my dessert — shift schedule';
+        document.getElementById('resetDessertBtn').style.display = 'none';
+        showMessage('Dessert schedule reset!', 'info');
+        setTimeout(loadSchedule, 1000);
+      }
+    } catch (e) {
+      showMessage('Error: ' + e.message, 'error');
+    }
+  }
+
+  // ── Test Notification ─────────────────────────────────────────────────────────
+  async function sendTest() {
+    try {
+      await fetch(`${SERVER}/test-notification`, { method: 'POST' });
+      showMessage('Test notification sent!', 'info');
+    } catch (e) {
+      showMessage('Error sending test', 'error');
+    }
+  }
+
+  // ── Re-subscribe ─────────────────────────────────────────────────────────────
+  async function resubscribe() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe();
+      
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey)
+      });
+
+      await fetch(SERVER + '/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+      });
+
+      showMessage('✅ Re-subscribed! Try test notification now.', 'success');
+      checkNotificationStatus();
+    } catch (err) {
+      showMessage('Error: ' + err.message, 'error');
+    }
+  }
+
+  // ── Load Today's Schedule ─────────────────────────────────────────────────────
+  async function loadSchedule() {
+    try {
+      const res = await fetch(`${SERVER}/today-schedule`);
+      const data = await res.json();
+      const schedule = data.schedule;
+      if (data.mealLogged) {
+        document.getElementById('mealLogged').style.display = 'block';
+        document.getElementById('mealBtn').disabled = true;
+        document.getElementById('mealBtn').style.opacity = '0.5';
+        document.getElementById('mealBtn').textContent = '✅ Meal already logged today';
+        document.getElementById('resetBtn').style.display = 'block';
+      }
+
+      if (schedule.length === 0) {
+        document.getElementById('scheduleContainer').innerHTML = '<div class="loading">Could not load schedule</div>';
+        return;
+      }
+
+      // Extract Maghrib time (offset 0 item)
+      const iftarItem = schedule.find(s => s.title.includes('Hydration #1'));
+      if (iftarItem) {
+        document.getElementById('maghribTime').textContent = iftarItem.time;
+      }
+
+      const list = document.createElement('ul');
+      list.className = 'schedule-list';
+
+      for (const item of schedule) {
+        const li = document.createElement('li');
+        li.className = 'schedule-item' + (item.sent ? ' sent' : '') + (item.shifted ? ' shifted' : '');
+        li.innerHTML = `
+          <div class="schedule-time">${item.time}</div>
+          <div class="schedule-content">
+            <div class="title">${item.title}</div>
+            <div class="desc">${item.body}</div>
+          </div>
+        `;
+        list.appendChild(li);
+      }
+
+      document.getElementById('scheduleContainer').innerHTML = '';
+      document.getElementById('scheduleContainer').appendChild(list);
+    } catch (e) {
+      document.getElementById('scheduleContainer').innerHTML = '<div class="loading">Error loading schedule</div>';
+    }
+  }
+
+  // ── Register Service Worker ───────────────────────────────────────────────────
+  async function init() {
+    if ('serviceWorker' in navigator) {
+      try {
+        await navigator.serviceWorker.register('/sw.js');
+        await loadVapidKey();
+        await checkNotificationStatus();
+        await loadSchedule();
+
+        // Refresh schedule every minute
+        setInterval(loadSchedule, 60000);
+      } catch (err) {
+        console.error('SW registration failed', err);
+      }
+    } else {
+      document.getElementById('notifStatus').textContent = 'Service workers not supported';
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

@@ -1,288 +1,151 @@
-const express = require('express');
-const webpush = require('web-push');
-const cron = require('node-cron');
-const axios = require('axios');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dell AI Notice</title>
+<meta charset="UTF-8">
+<meta http-equiv="PRAGMA" content="NO-CACHE">
+<meta name="viewport" content="initial-scale=1.0">
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
+<!-- Import Roboto font from Google Fonts -->
+<link href="https://fonts.googleapismily=Roboto&display=swap">
 
-// ─── VAPID KEYS ───────────────────────────────────────────────────────────────
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-
-webpush.setVapidDetails(
-  'mailto:ramadan@notifier.com',
-  VAPID_PUBLIC_KEY,
-  VAPID_PRIVATE_KEY
-);
-
-// ─── STORE SUBSCRIPTIONS ──────────────────────────────────────────────────────
-let subscriptions = [];
-const SUBS_FILE = '/tmp/subscriptions.json';
-
-function loadSubscriptions() {
-  try {
-    if (fs.existsSync(SUBS_FILE)) {
-      subscriptions = JSON.parse(fs.readFileSync(SUBS_FILE, 'utf8'));
-      console.log(`Loaded ${subscriptions.length} subscriptions`);
-    }
-  } catch (e) {
-    subscriptions = [];
-  }
+<style>
+body {
+font-family: Roboto, 'Cordia New', "Microsoft Sans Serif", Utsaah, 'Devanagari MT', 'Nirmala UI', Latha, InaiMathi, Gautami, 'Telugu Sangam MN', Tunga, 'Kannada Sangam MN', Kartika, 'Malayalam Sangam MN', Shruti, 'Gujarati MT', 'Gujarati Sangam MN', Vrinda, 'Bangla Sangam MN', 'Meiryo UI', 'メイリオ', 'MS UI Gothic Reg', 'Hiragino Kaku Gothic Reg', 'ヒラギノ角ゴ Pro W3 Reg', 'Microsoft YaHei', '微软雅黑', 'Hiragino Sans GB', 'Microsoft JhengHei', '微軟正黑體', 'Malgun Gothic', '맑은 고딕', Gulim, AppleGothic, 'Apple LiGothic', 'LiHei Pro', Osaka, STHeiti, '华文黑体', STXihei, '华文细黑', SimHei, '黑体', 'Arial Unicode MS', Arial, sans-serif;
 }
 
-function saveSubscriptions() {
-  try {
-    fs.writeFileSync(SUBS_FILE, JSON.stringify(subscriptions));
-  } catch (e) {
-    console.error('Error saving subscriptions', e);
-  }
+#content {
+border: 2px solid #aaa;
+background-color: #fff;
+margin: .5em auto;
+padding: 1em;
+max-width: 800px;
+font-size: 1em;
+text-align: center;
 }
 
-loadSubscriptions();
-
-// ─── RAMADAN SCHEDULE ─────────────────────────────────────────────────────────
-// Steps marked shiftable: false are fixed to Maghrib time and never shift.
-// Steps marked shiftable: true are shifted when meal finish time is logged.
-// shiftOffset: minutes after meal finish time for shiftable steps.
-const SCHEDULE = [
-  { offset: -60, shiftable: false, title: '🚶 Time for your walk!',          body: 'Start your 20–30 min pre-Iftar fat-burn walk. Finish before Adhan.' },
-  { offset: 0,   shiftable: false, title: '🌙 Break your fast!',              body: 'Drink 250ml warm water slowly. Don\'t chug!' },
-  { offset: 5,   shiftable: false, title: '🍽️ Iftar meal time',               body: 'Start light, then your main plate. Eat normally.' },
-  { offset: 40,  shiftable: true,  shiftOffset: 0,   title: '⏸️ Digestion gap',               body: 'No big water now. Tiny sips only if needed. Let your body digest.' },
-  { offset: 60,  shiftable: true,  shiftOffset: 20,  title: '💧 Hydration #1',                body: 'Drink 250ml cool water. Resume hydration.' },
-  { offset: 100, shiftable: true,  shiftOffset: 60,  title: '💧 Hydration #2',                body: 'Drink 250ml cool water. Keep it steady.' },
-  { offset: 145, shiftable: true,  shiftOffset: 105, title: '💧 Hydration #3',                body: 'Drink 250ml cool water.' },
-  { offset: 155, shiftable: true,  shiftOffset: 115, title: '🍬 Dessert window opens!',       body: 'Dessert is OK now! Keep it to 1 palm portion.' },
-  { offset: 160, shiftable: true,  shiftOffset: 120, dessertShiftable: true,  dessertShiftOffset: 0,   title: '💧 Hydration #4',                body: 'Drink 250ml cool water.' },
-  { offset: 175, shiftable: true,  shiftOffset: 135, dessertShiftable: true,  dessertShiftOffset: 15,  title: '💧 Hydration #5',                body: 'Drink 250ml cool water. Almost at 2L!' },
-  { offset: 205, shiftable: true,  shiftOffset: 165, dessertShiftable: true,  dessertShiftOffset: 45,  title: '💧 Hydration #6',                body: 'Drink 200–250ml warm water. After dessert hydration.' },
-  { offset: 255, shiftable: true,  shiftOffset: 215, dessertShiftable: true,  dessertShiftOffset: 95,  title: '🥗 Last meal time (protein cap)', body: 'Light meal: milk/yogurt/eggs/cheese + cucumber/tomato.' },
-  { offset: 300, shiftable: true,  shiftOffset: 260, dessertShiftable: true,  dessertShiftOffset: 140, title: '💧 Last big drink of the night', body: 'Drink 300ml cool water. This is your last proper drink!' },
-  { offset: 325, shiftable: true,  shiftOffset: 285, dessertShiftable: true,  dessertShiftOffset: 165, title: '🚫 Fluids OFF',                  body: 'Stop drinking now. Tiny sips only if mouth is dry. Sleep well!' },
-];
-
-// ─── FETCH MAGHRIB TIME ───────────────────────────────────────────────────────
-async function getMaghribTime(date) {
-  const day = date.getDate();
-  const month = date.getMonth() + 1;
-  const year = date.getFullYear();
-
-  const url = `https://api.aladhan.com/v1/timingsByCity/${day}-${month}-${year}?city=Cairo&country=Egypt&method=5`;
-  const response = await axios.get(url);
-  const maghribStr = response.data.data.timings.Maghrib;
-  const [hours, minutes] = maghribStr.split(':').map(Number);
-
-  // Cairo is UTC+2. Store as UTC by subtracting 2 hours.
-  const maghrib = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hours - 2, minutes, 0, 0));
-  return maghrib;
+h1 {
+font-size: 1.8em;
+font-weight: bold;
+color: #005EB8;/*professional blue*/
+margin-top: 0;
+margin: 0.02em;
 }
 
-// ─── SEND NOTIFICATION ────────────────────────────────────────────────────────
-async function sendNotification(title, body) {
-  const payload = JSON.stringify({ title, body });
-  const toRemove = [];
-
-  for (let i = 0; i < subscriptions.length; i++) {
-    try {
-      await webpush.sendNotification(subscriptions[i], payload);
-    } catch (err) {
-      if (err.statusCode === 410 || err.statusCode === 404) {
-        toRemove.push(i);
-      }
-    }
-  }
-
-  for (let i = toRemove.length - 1; i >= 0; i--) {
-    subscriptions.splice(toRemove[i], 1);
-  }
-  if (toRemove.length > 0) saveSubscriptions();
-  console.log(`Sent notification: ${title}`);
+b {
+font-weight: normal;
+color: #196390;
 }
 
-// ─── DAILY SCHEDULER ─────────────────────────────────────────────────────────
-let todaySchedule = [];
-let lastScheduleDate = null;
-let mealFinishTime = null; // set when user logs meal finish
-let dessertFinishTime = null; // set when user logs dessert finish
-
-async function buildTodaySchedule() {
-  const today = new Date();
-  const dateKey = today.toDateString();
-
-  if (lastScheduleDate === dateKey) return;
-  lastScheduleDate = dateKey;
-  todaySchedule = [];
-  mealFinishTime = null; // reset each day
-  dessertFinishTime = null; // reset each day
-
-  try {
-    const maghrib = await getMaghribTime(today);
-    console.log(`Today Maghrib: ${maghrib.toTimeString()}`);
-
-    for (const step of SCHEDULE) {
-      const notifTime = new Date(maghrib.getTime() + step.offset * 60000);
-      todaySchedule.push({
-        time: notifTime,
-        title: step.title,
-        body: step.body,
-        shiftable: step.shiftable,
-        shiftOffset: step.shiftOffset || 0,
-        dessertShiftable: step.dessertShiftable || false,
-        dessertShiftOffset: step.dessertShiftOffset || 0,
-        sent: false,
-        shifted: false
-      });
-    }
-
-    console.log(`Built schedule with ${todaySchedule.length} notifications`);
-  } catch (err) {
-    console.error('Error fetching prayer times:', err.message);
-  }
+.clickable-text {
+color: blue;
+text-decoration: underline;
+cursor: pointer;
 }
 
-// ─── SHIFT SCHEDULE AFTER MEAL FINISH ────────────────────────────────────────
-function applyMealFinishShift(finishTime) {
-  mealFinishTime = finishTime;
-  let shifted = 0;
-
-  for (const item of todaySchedule) {
-    if (item.shiftable && !item.sent) {
-      const newTime = new Date(finishTime.getTime() + item.shiftOffset * 60000);
-      item.time = newTime;
-      item.shifted = true;
-      shifted++;
-    }
-  }
-
-  console.log(`Shifted ${shifted} notifications based on meal finish time: ${finishTime.toISOString()}`);
+.clickable-text:hover {
+color: darkblue;
 }
 
-// ─── SHIFT SCHEDULE AFTER DESSERT FINISH ────────────────────────────────────
-function applyDessertFinishShift(finishTime) {
-  dessertFinishTime = finishTime;
-  let shifted = 0;
-
-  for (const item of todaySchedule) {
-    if (item.dessertShiftable && !item.sent) {
-      const newTime = new Date(finishTime.getTime() + item.dessertShiftOffset * 60000);
-      item.time = newTime;
-      item.shifted = true;
-      shifted++;
-    }
-  }
-
-  console.log('Shifted ' + shifted + ' notifications based on dessert finish time: ' + finishTime.toISOString());
+p {
+font-size: 0.8em;
+margin: 0.5em 0;
 }
 
-// Run every minute
-cron.schedule('* * * * *', async () => {
-  await buildTodaySchedule();
+#continueText {
+font-size: 0.8em;
+margin-top: 1em;
+color: #005EB8; /*Match h1 color*/
+}
 
-  const now = new Date();
-  for (const item of todaySchedule) {
-    if (!item.sent && now >= item.time && (now - item.time) < 90000) {
-      item.sent = true;
-      await sendNotification(item.title, item.body);
-    }
-  }
-});
+.crop-container {
+object-fit: cover;
+width: 100%;
+max-width: 380px;
+height: 50px;
+object-position: center 50%;
+position: relative;
+margin: 0 auto;
+}
 
-buildTodaySchedule();
+</style>
 
-// ─── API ROUTES ───────────────────────────────────────────────────────────────
+</head>
+<body bgcolor="#e7e8e9">
+<div id="content">
+<img class="crop-container" src="data:image/png;base64,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" alt="Dell Logo">
 
-// Subscribe
-app.post('/subscribe', (req, res) => {
-  const subscription = req.body;
-  const exists = subscriptions.find(s => s.endpoint === subscription.endpoint);
-  if (!exists) {
-    subscriptions.push(subscription);
-    saveSubscriptions();
-    console.log('New subscription added');
-  }
-  res.json({ success: true });
-});
+<h1>Notice</h1>
 
-// Get VAPID public key
-app.get('/vapid-public-key', (req, res) => {
-  res.json({ key: VAPID_PUBLIC_KEY });
-});
+<div id="warningText"></div>
 
-// Log meal finish time → shift remaining notifications
-app.post('/meal-finished', (req, res) => {
-  const finishTime = new Date(); // use server time = now
-  applyMealFinishShift(finishTime);
 
-  const cairoTime = finishTime.toLocaleTimeString('en-EG', {
-    hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo'
-  });
 
-  sendNotification('✅ Schedule updated!', `Meal finish logged at ${cairoTime}. All remaining notifications shifted accordingly.`);
-  res.json({ success: true, finishTime: cairoTime });
-});
+<script type="text/javascript">
 
-// Log dessert finish time → shift remaining notifications
-app.post('/dessert-finished', (req, res) => {
-  const finishTime = new Date();
-  applyDessertFinishShift(finishTime);
+var cat = "artificial-intelligence"; //
+var site = "https://claude.ai/api/organizations/30c657f7-619d-4b69-b2b7-1b939c5abad7/conversations/9846b37b-fb4b-4a31-a5f1-a94b813d289b/wiggle/download-file?path=/mnt/user-data/outputs/ramadan-app/server.js"; //
+var text = "";
 
-  const cairoTime = finishTime.toLocaleTimeString('en-EG', {
-    hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo'
-  });
+switch (cat) {
+case 'translation':
+text =
+`
+For translations, you are required to use the
+<a style='font-weight:bold; color:blue; text-decoration: underline;'
+href='https://translationservices.dell.com/text/MachineTranslation'>
+Translation Services Portal
+</a>.<br>
+`;
 
-  sendNotification('🍬 Dessert logged!', 'Finished at ' + cairoTime + '. Remaining notifications shifted.');
-  res.json({ success: true, finishTime: cairoTime });
-});
+break;
 
-// Reset dessert finish log
-app.post('/reset-dessert', (req, res) => {
-  dessertFinishTime = null;
-  lastScheduleDate = null;
-  buildTodaySchedule();
-  console.log('Dessert finish reset. Schedule restored.');
-  res.json({ success: true });
-});
+case 'Generative-AI':
+text = `
 
-// Reset meal finish log
-app.post('/reset-meal', (req, res) => {
-  mealFinishTime = null;
-  // Rebuild schedule from scratch
-  lastScheduleDate = null;
-  buildTodaySchedule();
-  console.log('Meal finish reset. Schedule restored to automatic.');
-  res.json({ success: true });
-});
+You are accessing a public AI tool. To ensure Dell data is secure, it is highly recommended to use one of Dell&rsquo;s approved <a href="https://dell.sharepoint.com/sites/DTXContentManagement/SitePages/AI-Resources.aspx?CT=1755676778218&amp;OR=OWA-NT-Mail&amp;CID=eca3a0a7-7ed6-a48a-b8bf-81185ac39c4c&amp;web=1&amp;xsdata=MDV8MDJ8R3JhaGFtLkNvc3RlbGxvZUBkZWxsLmNvbXxhZTdlZDg1NDhkYWY0MGY4MmQ3ZDA4ZGRkZjg1NTUxNXw5NDVjMTk5YTgzYTI0ZTgwOWY4YzVhOTFiZTU3NTJkZHwwfDB8NjM4OTEyNDg1OTkxNzU1MDI0fFVua25vd258VFdGcGJHWnNiM2Q4ZXlKRmJYQjBlVTFoY0draU9uUnlkV1VzSWxZaU9pSXdMakF1TURBd01DSXNJbEFpT2lKWGFXNHpNaUlzSWtGT0lqb2lUV0ZwYkNJc0lsZFVJam95ZlE9PXwwfHx8&amp;sdata=V2IwTWQzNDRDckFzdi9FSkhXVnZnWkIyZFJJMGl5TjJlMU1VWDdtc0JPST0%3d&amp;clickParams=eyJYLUFwcE5hbWUiOiJNaWNyb3NvZnQgT3V0bG9vayBXZWIgQXBwIiwiWC1BcHBWZXJzaW9uIjoiMjAyNTA4MDgwMDUuMDgiLCJPUyI6IldpbmRvd3MgMTEifQ%3d%3d&amp;SafelinksUrl=https%3a%2f%2fdell.sharepoint.com%2fsites%2fDTXContentManagement%2fSitePages%2fAI-Resources.aspx"> AI tools</a> for team member use. <br />
+For your most common generative AI needs, there are powerful approved &amp; secure tools: e.g. <a href="https://m365.cloud.microsoft/chat/"> CoPilot Chat.</a><br /><br />
+<em><strong>Notice:</strong> If you choose to proceed to a public AI tool, it is mandatory to familiarize yourself with the <a href="https://dell.sharepoint.com/sites/AICentral/SitePages/GenAI"> guidelines</a> for using AI at Dell.<br />
+Proceeding to a public AI tool will also be logged for security purposes. No confidential, proprietary, sensitive or personal information should ever be entered to a public site. </em><br /><br />
+If you have a business-critical use case to use a public AI tool with non-public information, please <a href="&lt;https://dell.sharepoint.com/sites/AICentral/SitePages/AI-Use-Case-Submissions.aspx"> submit</a> for approval to the Dell AI Office. `;
+break;
 
-// Get today's schedule
-app.get('/today-schedule', async (req, res) => {
-  await buildTodaySchedule();
-  const schedule = todaySchedule.map(item => ({
-    time: item.time.toLocaleTimeString('en-EG', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo' }),
-    title: item.title,
-    body: item.body,
-    sent: item.sent,
-    shifted: item.shifted || false
-  }));
-  res.json({ schedule, mealLogged: mealFinishTime !== null, dessertLogged: dessertFinishTime !== null });
-});
+case 'artificial-intelligence':
+text = `
 
-// Test notification
-app.post('/test-notification', async (req, res) => {
-  await sendNotification('🧪 Test Notification', 'Your Ramadan notifier is working!');
-  res.json({ success: true });
-});
+You are accessing a public AI tool. To ensure Dell data is secure, it is highly recommended to use one of Dell&rsquo;s approved <a href="https://dell.sharepoint.com/sites/DTXContentManagement/SitePages/AI-Resources.aspx?CT=1755676778218&amp;OR=OWA-NT-Mail&amp;CID=eca3a0a7-7ed6-a48a-b8bf-81185ac39c4c&amp;web=1&amp;xsdata=MDV8MDJ8R3JhaGFtLkNvc3RlbGxvZUBkZWxsLmNvbXxhZTdlZDg1NDhkYWY0MGY4MmQ3ZDA4ZGRkZjg1NTUxNXw5NDVjMTk5YTgzYTI0ZTgwOWY4YzVhOTFiZTU3NTJkZHwwfDB8NjM4OTEyNDg1OTkxNzU1MDI0fFVua25vd258VFdGcGJHWnNiM2Q4ZXlKRmJYQjBlVTFoY0draU9uUnlkV1VzSWxZaU9pSXdMakF1TURBd01DSXNJbEFpT2lKWGFXNHpNaUlzSWtGT0lqb2lUV0ZwYkNJc0lsZFVJam95ZlE9PXwwfHx8&amp;sdata=V2IwTWQzNDRDckFzdi9FSkhXVnZnWkIyZFJJMGl5TjJlMU1VWDdtc0JPST0%3d&amp;clickParams=eyJYLUFwcE5hbWUiOiJNaWNyb3NvZnQgT3V0bG9vayBXZWIgQXBwIiwiWC1BcHBWZXJzaW9uIjoiMjAyNTA4MDgwMDUuMDgiLCJPUyI6IldpbmRvd3MgMTEifQ%3d%3d&amp;SafelinksUrl=https%3a%2f%2fdell.sharepoint.com%2fsites%2fDTXContentManagement%2fSitePages%2fAI-Resources.aspx"> AI tools</a> for team member use. <br />
+For your most common generative AI needs, there are powerful approved &amp; secure tools: e.g. <a href="https://m365.cloud.microsoft/chat/"> CoPilot Chat.</a><br /><br />
+<em><strong>Notice:</strong> If you choose to proceed to a public AI tool, it is mandatory to familiarize yourself with the <a href="https://dell.sharepoint.com/sites/AICentral/SitePages/GenAI%20-%20in%20Dell%20Technologies.aspx"> guidelines</a> for using AI at Dell.<br />
+Proceeding to a public AI tool will also be logged for security purposes. No confidential, proprietary, sensitive or personal information should ever be entered to a public site. </em><br /><br />
+If you have a business-critical use case to use a public AI tool with non-public information, please <a href="https://dell.sharepoint.com/sites/AICentral/SitePages/AI-Use-Case-Submissions.aspx"> submit</a> for approval to the Dell AI Office. `;
+break;
 
-// Health check
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+case 'Blueprintserver':
+text = `
+<h3>We have moved from Diligent Entities (Blueprint) to Athennian.</h3>
+      <p>Please update your bookmarks with the new Entities Management tool: Athennian</p>
+      <a href="https://dell.athennian.com" target="_blank">Click here to go to Athennian</a>
+`;
+break;
+}
 
-// ─── START SERVER ─────────────────────────────────────────────────────────────
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Ramadan Notifier server running on port ${PORT}`);
-});
+document.getElementById("warningText").innerHTML = text;
+
+</script>
+<hr>
+<p id="continueText" ><b>Click continue to proceed to the page. </b></p>
+<div id="formdiv">
+
+<form name="login" id="login_form" method="POST" action="/php/urlblock.php?args=AAAAfQAAABAqkZtysAf7zcdwrGKYWKfjAAAAEPWtvNu3Xq7rLUXcwzE7CTYAAABNAAAATXhKPKbZtk6X6QjFoa-Z4GPCy1dyxvwHg_SbUW8FYhlah2shLnOG5mqgnB2D1f1Qhz9JFekqArxQQiP4rpaBLrv_ROKwd-hewCuxeHBI&url=https://claude.ai%2fapi%2forganizations%2f30c657f7-619d-4b69-b2b7-1b939c5abad7%2fconversations%2f9846b37b-fb4b-4a31-a5f1-a94b813d289b%2fwiggle%2fdownload-file%3fpath%3d%2fmnt%2fuser-data%2foutputs%2framadan-app%2fserver.js">
+<input type="submit" name="ok" value="Continue">
+</form>
+
+
+<p id="guidelines">
+
+
+</div>
+</body>
+</html>
+
+ 

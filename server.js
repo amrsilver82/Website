@@ -46,25 +46,138 @@ function saveSubscriptions() {
 
 loadSubscriptions();
 
-// ─── RAMADAN SCHEDULE ─────────────────────────────────────────────────────────
-// Steps marked shiftable: false are fixed to Maghrib time and never shift.
-// Steps marked shiftable: true are shifted when meal finish time is logged.
-// shiftOffset: minutes after meal finish time for shiftable steps.
+// ─── RAMADAN SCHEDULE v2 ──────────────────────────────────────────────────────
+// offset        = minutes relative to Maghrib (I)
+// shiftable     = shifts when meal finish is logged
+// shiftOffset   = minutes after meal finish time
+// dessertShiftable  = shifts when dessert finish is logged
+// dessertShiftOffset = minutes after dessert finish time
+//
+// Full schedule based on Maghrib = 5:47 PM Cairo example:
+// 4:47 PM  | Walk           | I-60
+// 5:47 PM  | Hydration #1   | I+0    (break fast 250ml warm)
+// 5:52 PM  | Iftar meal     | I+5
+// 6:27 PM  | Digestion gap  | I+40
+// 6:47 PM  | Hydration #2   | I+60   (60 mins from #1)
+// 7:27 PM  | Hydration #3   | I+100  (40 mins)
+// 7:57 PM  | Hydration #4   | I+130  (30 mins, 25 mins before dessert)
+// 8:22 PM  | Dessert window | I+155  (25 mins after #4)
+// 9:12 PM  | Hydration #5   | I+205  (50 mins after dessert)
+// 9:47 PM  | Hydration #6   | I+240  (35 mins)
+// 10:02 PM | Late dinner    | I+255  (15 mins after #6)
+// 10:32 PM | Hydration #7   | I+285  (30 mins after dinner)
+// 11:02 PM | Hydration #8   | I+315  (30 mins) - Last big drink 300ml
+// 11:27 PM | Fluids OFF     | I+340  (25 mins)
+// Total water: 7x250ml + 1x300ml = 2050ml ✅
+
 const SCHEDULE = [
-  { offset: -60, shiftable: false, title: '🚶 Time for your walk!',          body: 'Start your 20–30 min pre-Iftar fat-burn walk. Finish before Adhan.' },
-  { offset: 0,   shiftable: false, title: '🌙 Break your fast!',              body: 'Drink 250ml warm water slowly. Don\'t chug!' },
-  { offset: 5,   shiftable: false, title: '🍽️ Iftar meal time',               body: 'Start light, then your main plate. Eat normally.' },
-  { offset: 40,  shiftable: true,  shiftOffset: 0,   title: '⏸️ Digestion gap',               body: 'No big water now. Tiny sips only if needed. Let your body digest.' },
-  { offset: 60,  shiftable: true,  shiftOffset: 20,  title: '💧 Hydration #1',                body: 'Drink 250ml cool water. Resume hydration.' },
-  { offset: 100, shiftable: true,  shiftOffset: 60,  title: '💧 Hydration #2',                body: 'Drink 250ml cool water. Keep it steady.' },
-  { offset: 145, shiftable: true,  shiftOffset: 105, title: '💧 Hydration #3',                body: 'Drink 250ml cool water.' },
-  { offset: 155, shiftable: true,  shiftOffset: 115, title: '🍬 Dessert window opens!',       body: 'Dessert is OK now! Keep it to 1 palm portion.' },
-  { offset: 160, shiftable: true,  shiftOffset: 120, dessertShiftable: true,  dessertShiftOffset: 0,   title: '💧 Hydration #4',                body: 'Drink 250ml cool water.' },
-  { offset: 175, shiftable: true,  shiftOffset: 135, dessertShiftable: true,  dessertShiftOffset: 15,  title: '💧 Hydration #5',                body: 'Drink 250ml cool water. Almost at 2L!' },
-  { offset: 205, shiftable: true,  shiftOffset: 165, dessertShiftable: true,  dessertShiftOffset: 45,  title: '💧 Hydration #6',                body: 'Drink 200–250ml warm water. After dessert hydration.' },
-  { offset: 255, shiftable: true,  shiftOffset: 215, dessertShiftable: true,  dessertShiftOffset: 95,  title: '🥗 Last meal time (protein cap)', body: 'Light meal: milk/yogurt/eggs/cheese + cucumber/tomato.' },
-  { offset: 300, shiftable: true,  shiftOffset: 260, dessertShiftable: true,  dessertShiftOffset: 140, title: '💧 Last big drink of the night', body: 'Drink 300ml cool water. This is your last proper drink!' },
-  { offset: 325, shiftable: true,  shiftOffset: 285, dessertShiftable: true,  dessertShiftOffset: 165, title: '🚫 Fluids OFF',                  body: 'Stop drinking now. Tiny sips only if mouth is dry. Sleep well!' },
+  {
+    offset: -60,
+    shiftable: false,
+    title: '🚶 Time for your walk!',
+    body: 'Start your 20-30 min pre-Iftar fat-burn walk. Finish before Adhan.'
+  },
+  {
+    offset: 0,
+    shiftable: false,
+    title: '💧 Hydration #1',
+    body: 'Break your fast! Drink 250ml warm water slowly. Do not chug!'
+  },
+  {
+    offset: 5,
+    shiftable: false,
+    title: '🍽️ Iftar meal time',
+    body: 'Start light, then your main plate. Eat normally.'
+  },
+  {
+    offset: 40,
+    shiftable: true,
+    shiftOffset: 0,
+    title: '⏸️ Digestion gap',
+    body: 'No big water now. Tiny sips only if needed. Let your body digest.'
+  },
+  {
+    offset: 60,
+    shiftable: true,
+    shiftOffset: 20,
+    title: '💧 Hydration #2',
+    body: 'Drink 250ml cool water. Resume hydration.'
+  },
+  {
+    offset: 100,
+    shiftable: true,
+    shiftOffset: 60,
+    title: '💧 Hydration #3',
+    body: 'Drink 250ml cool water. Keep it steady.'
+  },
+  {
+    offset: 130,
+    shiftable: true,
+    shiftOffset: 90,
+    title: '💧 Hydration #4',
+    body: 'Drink 250ml cool water. 25 mins before dessert window.'
+  },
+  {
+    offset: 155,
+    shiftable: true,
+    shiftOffset: 115,
+    title: '🍬 Dessert window opens!',
+    body: 'Dessert is OK now! Keep it to 1 palm portion.'
+  },
+  {
+    offset: 205,
+    shiftable: true,
+    shiftOffset: 165,
+    dessertShiftable: true,
+    dessertShiftOffset: 0,
+    title: '💧 Hydration #5',
+    body: 'Drink 250ml cool water. First hydration after dessert.'
+  },
+  {
+    offset: 240,
+    shiftable: true,
+    shiftOffset: 200,
+    dessertShiftable: true,
+    dessertShiftOffset: 35,
+    title: '💧 Hydration #6',
+    body: 'Drink 250ml cool water.'
+  },
+  {
+    offset: 255,
+    shiftable: true,
+    shiftOffset: 215,
+    dessertShiftable: true,
+    dessertShiftOffset: 50,
+    title: '🥗 Late dinner (protein cap)',
+    body: 'Light meal: milk/yogurt/eggs/cheese + cucumber/tomato.'
+  },
+  {
+    offset: 285,
+    shiftable: true,
+    shiftOffset: 245,
+    dessertShiftable: true,
+    dessertShiftOffset: 80,
+    title: '💧 Hydration #7',
+    body: 'Drink 250ml cool water. 30 mins after late dinner.'
+  },
+  {
+    offset: 315,
+    shiftable: true,
+    shiftOffset: 275,
+    dessertShiftable: true,
+    dessertShiftOffset: 110,
+    title: '💧 Hydration #8',
+    body: 'Drink 300ml warm water. Last big drink of the night!'
+  },
+  {
+    offset: 340,
+    shiftable: true,
+    shiftOffset: 300,
+    dessertShiftable: true,
+    dessertShiftOffset: 135,
+    title: '🚫 Fluids OFF',
+    body: 'Stop drinking now. Tiny sips only if mouth is dry. Sleep well!'
+  },
 ];
 
 // ─── FETCH MAGHRIB TIME ───────────────────────────────────────────────────────
@@ -79,7 +192,14 @@ async function getMaghribTime(date) {
   const [hours, minutes] = maghribStr.split(':').map(Number);
 
   // Cairo is UTC+2. Store as UTC by subtracting 2 hours.
-  const maghrib = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hours - 2, minutes, 0, 0));
+  const maghrib = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    hours - 2,
+    minutes,
+    0, 0
+  ));
   return maghrib;
 }
 
@@ -108,8 +228,8 @@ async function sendNotification(title, body) {
 // ─── DAILY SCHEDULER ─────────────────────────────────────────────────────────
 let todaySchedule = [];
 let lastScheduleDate = null;
-let mealFinishTime = null; // set when user logs meal finish
-let dessertFinishTime = null; // set when user logs dessert finish
+let mealFinishTime = null;
+let dessertFinishTime = null;
 
 async function buildTodaySchedule() {
   const today = new Date();
@@ -118,8 +238,8 @@ async function buildTodaySchedule() {
   if (lastScheduleDate === dateKey) return;
   lastScheduleDate = dateKey;
   todaySchedule = [];
-  mealFinishTime = null; // reset each day
-  dessertFinishTime = null; // reset each day
+  mealFinishTime = null;
+  dessertFinishTime = null;
 
   try {
     const maghrib = await getMaghribTime(today);
@@ -131,7 +251,7 @@ async function buildTodaySchedule() {
         time: notifTime,
         title: step.title,
         body: step.body,
-        shiftable: step.shiftable,
+        shiftable: step.shiftable || false,
         shiftOffset: step.shiftOffset || 0,
         dessertShiftable: step.dessertShiftable || false,
         dessertShiftOffset: step.dessertShiftOffset || 0,
@@ -146,44 +266,37 @@ async function buildTodaySchedule() {
   }
 }
 
-// ─── SHIFT SCHEDULE AFTER MEAL FINISH ────────────────────────────────────────
+// ─── SHIFT AFTER MEAL FINISH ──────────────────────────────────────────────────
 function applyMealFinishShift(finishTime) {
   mealFinishTime = finishTime;
   let shifted = 0;
-
   for (const item of todaySchedule) {
     if (item.shiftable && !item.sent) {
-      const newTime = new Date(finishTime.getTime() + item.shiftOffset * 60000);
-      item.time = newTime;
+      item.time = new Date(finishTime.getTime() + item.shiftOffset * 60000);
       item.shifted = true;
       shifted++;
     }
   }
-
-  console.log(`Shifted ${shifted} notifications based on meal finish time: ${finishTime.toISOString()}`);
+  console.log(`Shifted ${shifted} notifications based on meal finish: ${finishTime.toISOString()}`);
 }
 
-// ─── SHIFT SCHEDULE AFTER DESSERT FINISH ────────────────────────────────────
+// ─── SHIFT AFTER DESSERT FINISH ───────────────────────────────────────────────
 function applyDessertFinishShift(finishTime) {
   dessertFinishTime = finishTime;
   let shifted = 0;
-
   for (const item of todaySchedule) {
     if (item.dessertShiftable && !item.sent) {
-      const newTime = new Date(finishTime.getTime() + item.dessertShiftOffset * 60000);
-      item.time = newTime;
+      item.time = new Date(finishTime.getTime() + item.dessertShiftOffset * 60000);
       item.shifted = true;
       shifted++;
     }
   }
-
-  console.log('Shifted ' + shifted + ' notifications based on dessert finish time: ' + finishTime.toISOString());
+  console.log(`Shifted ${shifted} notifications based on dessert finish: ${finishTime.toISOString()}`);
 }
 
-// Run every minute
+// ─── CRON: CHECK EVERY MINUTE ─────────────────────────────────────────────────
 cron.schedule('* * * * *', async () => {
   await buildTodaySchedule();
-
   const now = new Date();
   for (const item of todaySchedule) {
     if (!item.sent && now >= item.time && (now - item.time) < 90000) {
@@ -197,7 +310,6 @@ buildTodaySchedule();
 
 // ─── API ROUTES ───────────────────────────────────────────────────────────────
 
-// Subscribe
 app.post('/subscribe', (req, res) => {
   const subscription = req.body;
   const exists = subscriptions.find(s => s.endpoint === subscription.endpoint);
@@ -209,76 +321,69 @@ app.post('/subscribe', (req, res) => {
   res.json({ success: true });
 });
 
-// Get VAPID public key
 app.get('/vapid-public-key', (req, res) => {
   res.json({ key: VAPID_PUBLIC_KEY });
 });
 
-// Log meal finish time → shift remaining notifications
 app.post('/meal-finished', (req, res) => {
-  const finishTime = new Date(); // use server time = now
+  const finishTime = new Date();
   applyMealFinishShift(finishTime);
-
   const cairoTime = finishTime.toLocaleTimeString('en-EG', {
     hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo'
   });
-
-  sendNotification('✅ Schedule updated!', `Meal finish logged at ${cairoTime}. All remaining notifications shifted accordingly.`);
+  sendNotification('✅ Schedule updated!', `Meal finish logged at ${cairoTime}. All remaining notifications shifted.`);
   res.json({ success: true, finishTime: cairoTime });
 });
 
-// Log dessert finish time → shift remaining notifications
+app.post('/reset-meal', (req, res) => {
+  mealFinishTime = null;
+  lastScheduleDate = null;
+  buildTodaySchedule();
+  console.log('Meal finish reset.');
+  res.json({ success: true });
+});
+
 app.post('/dessert-finished', (req, res) => {
   const finishTime = new Date();
   applyDessertFinishShift(finishTime);
-
   const cairoTime = finishTime.toLocaleTimeString('en-EG', {
     hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo'
   });
-
-  sendNotification('🍬 Dessert logged!', 'Finished at ' + cairoTime + '. Remaining notifications shifted.');
+  sendNotification('🍬 Dessert logged!', `Finished at ${cairoTime}. Remaining notifications shifted.`);
   res.json({ success: true, finishTime: cairoTime });
 });
 
-// Reset dessert finish log
 app.post('/reset-dessert', (req, res) => {
   dessertFinishTime = null;
   lastScheduleDate = null;
   buildTodaySchedule();
-  console.log('Dessert finish reset. Schedule restored.');
+  console.log('Dessert finish reset.');
   res.json({ success: true });
 });
 
-// Reset meal finish log
-app.post('/reset-meal', (req, res) => {
-  mealFinishTime = null;
-  // Rebuild schedule from scratch
-  lastScheduleDate = null;
-  buildTodaySchedule();
-  console.log('Meal finish reset. Schedule restored to automatic.');
-  res.json({ success: true });
-});
-
-// Get today's schedule
 app.get('/today-schedule', async (req, res) => {
   await buildTodaySchedule();
   const schedule = todaySchedule.map(item => ({
-    time: item.time.toLocaleTimeString('en-EG', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo' }),
+    time: item.time.toLocaleTimeString('en-EG', {
+      hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo'
+    }),
     title: item.title,
     body: item.body,
     sent: item.sent,
     shifted: item.shifted || false
   }));
-  res.json({ schedule, mealLogged: mealFinishTime !== null, dessertLogged: dessertFinishTime !== null });
+  res.json({
+    schedule,
+    mealLogged: mealFinishTime !== null,
+    dessertLogged: dessertFinishTime !== null
+  });
 });
 
-// Test notification
 app.post('/test-notification', async (req, res) => {
   await sendNotification('🧪 Test Notification', 'Your Ramadan notifier is working!');
   res.json({ success: true });
 });
 
-// Health check
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // ─── START SERVER ─────────────────────────────────────────────────────────────

@@ -129,7 +129,7 @@ const SCHEDULE = [
     shiftable: true,
     shiftOffset: 165,
     dessertShiftable: true,
-    dessertShiftOffset: 0,
+    dessertShiftOffset: 30,
     title: '💧 Hydration #5',
     body: 'Drink 250ml cool water. First hydration after dessert.'
   },
@@ -138,7 +138,7 @@ const SCHEDULE = [
     shiftable: true,
     shiftOffset: 200,
     dessertShiftable: true,
-    dessertShiftOffset: 35,
+    dessertShiftOffset: 65,
     title: '💧 Hydration #6',
     body: 'Drink 250ml cool water.'
   },
@@ -147,7 +147,7 @@ const SCHEDULE = [
     shiftable: true,
     shiftOffset: 215,
     dessertShiftable: true,
-    dessertShiftOffset: 50,
+    dessertShiftOffset: 80,
     title: '🥗 Late dinner (protein cap)',
     body: 'Light meal: milk/yogurt/eggs/cheese + cucumber/tomato.'
   },
@@ -156,7 +156,7 @@ const SCHEDULE = [
     shiftable: true,
     shiftOffset: 245,
     dessertShiftable: true,
-    dessertShiftOffset: 80,
+    dessertShiftOffset: 110,
     title: '💧 Hydration #7',
     body: 'Drink 250ml cool water. 30 mins after late dinner.'
   },
@@ -165,7 +165,7 @@ const SCHEDULE = [
     shiftable: true,
     shiftOffset: 275,
     dessertShiftable: true,
-    dessertShiftOffset: 110,
+    dessertShiftOffset: 140,
     title: '💧 Hydration #8',
     body: 'Drink 300ml warm water. Last big drink of the night!'
   },
@@ -174,7 +174,7 @@ const SCHEDULE = [
     shiftable: true,
     shiftOffset: 300,
     dessertShiftable: true,
-    dessertShiftOffset: 135,
+    dessertShiftOffset: 165,
     title: '🚫 Fluids OFF',
     body: 'Stop drinking now. Tiny sips only if mouth is dry. Sleep well!'
   },
